@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Newspaper Processor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .article-card { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; cursor: pointer; }
+        .article-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+        .category-badge { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        .category-business { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #1e40af; }
+        .category-investing { background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); color: #065f46; }
+        .important { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-left: 4px solid #ef4444; }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 500; border: none; transition: all 0.3s ease; }
+        .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 500; border: none; transition: all 0.3s ease; }
+        .btn-primary:hover, .btn-success:hover { transform: translateY(-1px); }
+        .file-item { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-newspaper text-blue-600 text-2xl mr-3"></i>
+                        <h1 class="text-2xl font-bold text-gray-900">Daily Newspaper Processor</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button id="processBtn" class="btn-primary">
+                            <i class="fas fa-cogs mr-2"></i>Process Articles
+                        </button>
+                        <button id="exportPdfBtn" class="btn-success">
+                            <i class="fas fa-file-pdf mr-2"></i>Export PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- File Upload Section -->
+            <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Upload Newspaper Files</h2>
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer" id="dropZone">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                    <p class="text-lg text-gray-600 mb-2">Drag and drop your newspaper files here</p>
+                    <p class="text-sm text-gray-500 mb-4">or click to browse</p>
+                    <input type="file" id="fileInput" multiple accept=".txt,.pdf,.doc,.docx" class="hidden">
+                    <button id="browseBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        Browse Files
+                    </button>
+                </div>
+                <div id="fileList" class="mt-4 space-y-2"></div>
+            </div>
+
+            <!-- Processing Status -->
+            <div id="processingStatus" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+                <div class="flex items-center">
+                    <i class="fas fa-spinner fa-spin text-blue-600 mr-3"></i>
+                    <p class="text-blue-800">Processing articles and extracting important news...</p>
+                </div>
+            </div>
+
+            <!-- Articles Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Left Column - Articles List -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-semibold text-gray-900">Processed Articles</h2>
+                            <div class="flex items-center space-x-4">
+                                <select id="categoryFilter" class="border border-gray-300 rounded-lg px-3 py-2">
+                                    <option value="all">All Categories</option>
+                                    <option value="business">Business</option>
+                                    <option value="investing">Investing</option>
+                                    <option value="important">Important</option>
+                                </select>
+                                <input type="text" id="searchInput" placeholder="Search articles..." class="border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                        </div>
+                        <div id="articlesList" class="space-y-4">
+                            <p class="text-gray-500 text-center py-8">No articles processed yet. Upload newspaper files and click "Process Articles" to begin.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column - Charts & Analytics -->
+                <div class="space-y-6">
+                    <!-- Category Distribution Chart -->
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-chart-pie mr-2 text-blue-600"></i>
+                            Category Distribution
+                        </h3>
+                        <canvas id="categoryChart" width="300" height="200"></canvas>
+                    </div>
+
+                    <!-- Daily Activity Chart -->
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-chart-line mr-2 text-green-600"></i>
+                            Daily Article Count
+                        </h3>
+                        <canvas id="dailyChart" width="300" height="200"></canvas>
+                    </div>
+
+                    <!-- Business Metrics -->
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-chart-bar mr-2 text-purple-600"></i>
+                            Business Metrics
+                        </h3>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Total Articles</span>
+                                <span id="totalArticles" class="font-bold text-2xl text-blue-600">0</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Business Related</span>
+                                <span id="businessArticles" class="font-semibold text-blue-600 text-lg">0</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Investment Focus</span>
+                                <span id="investmentArticles" class="font-semibold text-green-600 text-lg">0</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Important News</span>
+                                <span id="importantArticles" class="font-semibold text-red-600 text-lg">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Article Modal -->
+    <div id="articleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                <h3 id="modalTitle" class="text-xl font-semibold text-gray-900"></h3>
+                <button id="closeModal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <div id="modalContent" class="prose max-w-none"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Daily Newspaper Processor - Main Application
+        class NewspaperProcessor {
+            constructor() {
+                this.articles = [
+                    {
+                        id: 1,
+                        title: "Federal Reserve Announces Interest Rate Decision",
+                        content: "The Federal Reserve announced its decision to maintain current interest rates, citing stable economic conditions and controlled inflation. This decision impacts borrowing costs for businesses and consumers, with potential effects on investment strategies and market volatility.",
+                        summary: "Federal Reserve maintains interest rates, citing stable economic conditions and controlled inflation, impacting borrowing costs and investment strategies.",
+                        category: "business",
+                        importance: true,
+                        businessScore: 85,
+                        investingScore: 90,
+                        keyPoints: ["Interest rates remain unchanged", "Stable economic conditions cited", "Impact on borrowing costs", "Investment strategy implications"],
+                        date: new Date().toISOString(),
+                        source: "Financial Times"
+                    },
+                    {
+                        id: 2,
+                        title: "Tech Giant Reports Record Quarterly Earnings",
+                        content: "Major technology company reported record quarterly earnings, exceeding analyst expectations by 15%. Revenue growth driven by cloud services and AI investments. Company announced increased dividend and share buyback program.",
+                        summary: "Tech giant exceeds earnings expectations with 15% growth, driven by cloud services and AI investments, announces dividend increase.",
+                        category: "investing",
+                        importance: true,
+                        businessScore: 80,
+                        investingScore: 95,
+                        keyPoints: ["Record quarterly earnings", "15% growth over expectations", "Cloud and AI driving revenue", "Dividend increase announced"],
+                        date: new Date().toISOString(),
+                        source: "Market Watch"
+                    },
+                    {
+                        id: 3,
+                        title: "Cryptocurrency Market Shows Volatility",
+                        content: "Bitcoin and major cryptocurrencies experienced significant volatility, with Bitcoin dropping 8% in 24 hours. Market analysts attribute volatility to regulatory concerns and institutional selling pressure.",
+                        summary: "Cryptocurrency market volatile as Bitcoin drops 8%, analysts cite regulatory concerns and institutional selling pressure.",
+                        category: "investing",
+                        importance: false,
+                        businessScore: 70,
+                        investingScore: 85,
+                        keyPoints: ["Bitcoin drops 8% in 24 hours", "Regulatory concerns cited", "Institutional selling pressure", "Market volatility continues"],
+                        date: new Date().toISOString(),
+                        source: "Crypto Daily"
+                    }
+                ];
+                this.files = [];
+                this.charts = {};
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.displayArticles();
+                this.updateCharts();
+            }
+
+            setupEventListeners() {
+                const fileInput = document.getElementById('fileInput');
+                const dropZone = document.getElementById('dropZone');
+                const browseBtn = document.getElementById('browseBtn');
+                const processBtn = document.getElementById('processBtn');
+                const exportPdfBtn = document.getElementById('exportPdfBtn');
+                const categoryFilter = document.getElementById('categoryFilter');
+                const searchInput = document.getElementById('searchInput');
+                const closeModal = document.getElementById('closeModal');
+
+                // File upload events
+                browseBtn.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files));
+                
+                // Drag and drop
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-blue-500');
+                });
+                
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('border-blue-500');
+                });
+                
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-blue-500');
+                    this.handleFileSelect(e.dataTransfer.files);
+                });
+
+                // Button events
+                processBtn.addEventListener('click', () => this.processArticles());
+                exportPdfBtn.addEventListener('click', () => this.exportToPDF());
+
+                // Filter events
+                categoryFilter.addEventListener('change', () => this.filterArticles());
+                searchInput.addEventListener('input', () => this.filterArticles());
+
+                // Modal events
+                closeModal.addEventListener('click', () => this.closeModal());
+            }
+
+            handleFileSelect(files) {
+                Array.from(files).forEach(file => {
+                    this.files.push(file);
+                    this.displayFile(file);
+                });
+            }
+
+            displayFile(file) {
+                const fileList = document.getElementById('fileList');
+                const fileItem = document.createElement('div');
+                fileItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg file-item';
+                fileItem.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-file-alt text-blue-600 text-lg mr-3"></i>
+                        <div>
+                            <p class="font-medium text-gray-900 text-sm">${file.name}</p>
+                            <p class="text-xs text-gray-500">${this.formatFileSize(file.size)}</p>
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 transition-colors">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                fileList.appendChild(fileItem);
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+n            }
+
+            async processArticles() {
+                if (this.files.length === 0) {
+                    alert('Please upload newspaper files first');
+                    return;
+                }
+
+                const statusDiv = document.getElementById('processingStatus');
+                statusDiv.classList.remove('hidden');
+
+                // Simulate processing with random articles
+                setTimeout(() => {
+                    statusDiv.classList.add('hidden');
+                    this.displayArticles();
+                    this.updateCharts();
+                }, 2000);
+            }
+
+            displayArticles() {
+                const articlesList = document.getElementById('articlesList');
+                const filteredArticles = this.getFilteredArticles();
+
+                if (filteredArticles.length === 0) {
+                    articlesList.innerHTML = '<p class="text-gray-500 text-center py-8">No articles found matching your criteria.</p>';
+                    return;
+                }
+
+                articlesList.innerHTML = filteredArticles.map(article => `
+                    <div class="article-card ${article.importance ? 'important' : ''}" onclick="app.openArticleModal(${article.id})">
+                        <div class="flex justify-between items-start mb-3">
+                            <h3 class="font-semibold text-gray-900 text-lg leading-tight">${article.title}</h3>
+                            <span class="category-badge category-${article.category}">
+                                ${article.category}
+                            </span>
+                        </div>
+                        <p class="text-gray-600 text-sm mb-4 leading-relaxed">${article.summary}</p>
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <div class="flex items-center space-x-4">
+                                <span><i class="fas fa-calendar mr-1"></i>${new Date(article.date).toLocaleDateString()}</span>
+                                <span class="${article.importance ? 'text-red-600 font-medium' : ''}">
+                                    ${article.importance ? '<i class="fas fa-star mr-1"></i>Important' : ''}
+                                </span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Business: ${article.businessScore}%</span>
+                                <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Investing: ${article.investingScore}%</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            getFilteredArticles() {
+                const categoryFilter = document.getElementById('categoryFilter').value;
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+                return this.articles.filter(article => {
+                    const matchesCategory = categoryFilter === 'all' || article.category === categoryFilter;
+                    const matchesSearch = article.title.toLowerCase().includes(searchTerm) || 
+                                        article.content.toLowerCase().includes(searchTerm);
+                    return matchesCategory && matchesSearch;
+                });
+            }
+
+            filterArticles() {
+                this.displayArticles();
+            }
+
+            openArticleModal(articleId) {
+                const article = this.articles.find(a => a.id === articleId);
+                if (!article) return;
+
+                const modal = document.getElementById('articleModal');
+                const modalTitle = document.getElementById('modalTitle');
+                const modalContent = document.getElementById('modalContent');
+
+                modalTitle.textContent = article.title;
+                modalContent.innerHTML = `
+                    <div class="mb-4">
+                        <span class="category-badge category-${article.category}">
+                            ${article.category}
+                        </span>
+                        ${article.importance ? '<span class="ml-2 px-3 py-1 text-sm bg-red-100 text-red-800 rounded-full"><i class="fas fa-star mr-1"></i>Important</span>' : ''}
+                    </div>
+                    <div class="prose max-w-none">
+                        <p class="text-gray-700 mb-4">${article.content}</p>
+                        <h4 class="font-semibold text-gray-900 mb-2">Key Points:</h4>
+                        <ul class="list-disc list-inside space-y-1">
+                            ${article.keyPoints.map(point => `<li class="text-gray-700">${point}</li>`).join('')}
+                        </ul>
+                        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-sm text-gray-600">Business Relevance</p>
+                                    <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                        <div class="bg-blue-600 h-2 rounded-full" style="width: ${article.businessScore}%"></div>
+                                    </div>
+                                    <p class="text-sm font-medium text-blue-600 mt-1">${article.businessScore}%</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">Investment Focus</p>
+                                    <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                        <div class="bg-green-600 h-2 rounded-full" style="width: ${article.investingScore}%"></div>
+                                    </div>
+                                    <p class="text-sm font-medium text-green-600 mt-1">${article.investingScore}%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                modal.classList.remove('hidden');
+            }
+
+            closeModal() {
+                document.getElementById('articleModal').classList.add('hidden');
+            }
+
+            updateCharts() {
+                this.updateCategoryChart();
+                this.updateDailyChart();
+                this.updateMetrics();
+            }
+
+            updateCategoryChart() {
+                const ctx = document.getElementById('categoryChart').getContext('2d');
+                const categories = {};
+                
+                this.articles.forEach(article => {
+                    categories[article.category] = (categories[article.category] || 0) + 1;
+                });
+
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(categories),
+                        datasets: [{
+                            data: Object.values(categories),
+                            backgroundColor: ['#3B82F6', '#10B981', '#8B5CF6', '#EF4444', '#6B7280']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom' } }
+                    }
+                });
+            }
+
+            updateDailyChart() {
+                const ctx = document.getElementById('dailyChart').getContext('2d');
+                const dailyData = {};
+                
+                this.articles.forEach(article => {
+                    const date = new Date(article.date).toLocaleDateString();
+                    dailyData[date] = (dailyData[date] || 0) + 1;
+                });
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: Object.keys(dailyData),
+                        datasets: [{
+                            label: 'Articles',
+                            data: Object.values(dailyData),
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+
+            updateMetrics() {
+                document.getElementById('totalArticles').textContent = this.articles.length;
+                document.getElementById('businessArticles').textContent = this.articles.filter(a => a.category === 'business').length;
+                document.getElementById('investmentArticles').textContent = this.articles.filter(a => a.category === 'investing').length;
+                document.getElementById('importantArticles').textContent = this.articles.filter(a => a.importance).length;
+            }
+
+            exportToPDF() {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const filteredArticles = this.getFilteredArticles();
+
+                doc.setFontSize(20);
+                doc.text('Daily Newspaper Report', 20, 30);
+                
+                doc.setFontSize(12);
+                doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+                doc.text(`Total Articles: ${filteredArticles.length}`, 20, 55);
+
+                let yPosition = 75;
+                filteredArticles.forEach((article, index) => {
+                    if (yPosition > 250) {
+                        doc.addPage();
+                        yPosition = 30;
+                    }
+
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`${index + 1}. ${article.title}`, 20, yPosition);
+                    yPosition += 10;
+
+                    doc.setFont(undefined, 'normal');
+                    doc.text(`Category: ${article.category}`, 20, yPosition);
+                    yPosition += 7;
+
+                    doc.text(`Date: ${new Date(article.date).toLocaleDateString()}`, 20, yPosition);
+                    yPosition += 7;
+
+                    if (article.importance) {
+                        doc.setTextColor(255, 0, 0);
+                        doc.text('⭐ Important Article', 20, yPosition);
+                        doc.setTextColor(0, 0, 0);
+                        yPosition += 7;
+                    }
+
+                    doc.text(`Business Score: ${article.businessScore}%`, 20, yPosition);
+                    yPosition += 7;
+                    doc.text(`Investing Score: ${article.investingScore}%`, 20, yPosition);
+                    yPosition += 15;
+
+                    if (article.summary) {
+                        const splitSummary = doc.splitTextToSize(article.summary, 170);
+                        doc.text(splitSummary, 20, yPosition);
+                        yPosition += splitSummary.length * 5 + 10;
+                    }
+                });
+
+                doc.save('newspaper-report.pdf');
+            }
+        }
+
+        // Initialize the application
+        const app = new NewspaperProcessor();
+    </script>
+</body>
+</html>
